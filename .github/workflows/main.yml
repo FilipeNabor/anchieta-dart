@@ -34,31 +34,33 @@ jobs:
       - name: Show Summary
         working-directory: ./aluno_code
         run: |
-          # 1. No Flutter --machine, cada teste finalizado gera um evento 'testDone'
-          # Filtramos apenas as conclusões de testes reais (escondendo os de carregamento)
-          grep '"type":"testDone"' machine_results.json | grep '"hidden":false' > filtered_results.txt || true
+          # 1. Filtra os resultados visíveis
+          grep '"type":"testDone"' machine_results.json | grep '"hidden":false' > filtered.txt || true
 
-          # 2. Contagem dos resultados
-          P=$(grep -c '"result":"success"' filtered_results.txt || echo 0)
-          F=$(grep -c '"result":"failure"' filtered_results.txt || echo 0)
-          E=$(grep -c '"result":"error"' filtered_results.txt || echo 0)
+          # 2. Conta e salva o número direto em arquivos temporários
+          grep -c '"result":"success"' filtered.txt > p.txt || echo "0" > p.txt
+          grep -c '"result":"failure"' filtered.txt > f.txt || echo "0" > f.txt
+          grep -c '"result":"error"' filtered.txt > e.txt || echo "0" > e.txt
 
-          # 3. Garantia de valores numéricos
-          P=${P:-0}
-          F=${F:-0}
-          E=${E:-0}
-          
-          REPROVADOS=$((F + E))
-          TOTAL=$((P + REPROVADOS))
+          # 3. Lê os arquivos para variáveis (Garante que não fiquem vazias)
+          PASSED=$(cat p.txt)
+          FAILED=$(cat f.txt)
+          ERRORS=$(cat e.txt)
+
+          # 4. Soma usando expr (o modo mais compatível do Linux)
+          # Se a variável estiver vazia, o '0' ali garante a conta
+          REPROVADOS=$(expr ${FAILED:-0} + ${ERRORS:-0})
+          TOTAL=$(expr ${PASSED:-0} + $REPROVADOS)
 
           echo "------------------------------------------"
-          echo "RESUMO COM FLUTTER TEST"
+          echo "RESUMO FINAL"
           echo "------------------------------------------"
           echo "Total de exercícios: $TOTAL"
-          echo "Passou: $P"
+          echo "Passou: ${PASSED:-0}"
           echo "Falhou: $REPROVADOS"
           echo "------------------------------------------"
 
+          # 5. Verificação de erro
           if [ "$REPROVADOS" -gt 0 ]; then
             echo "Status: REPROVADO"
             exit 1
